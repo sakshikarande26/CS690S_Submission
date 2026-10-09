@@ -109,6 +109,98 @@ class PolicyNetwork(nn.Module):
         return x
     
 
+class InverseDynamicsNetwork(nn.Module):
+    '''
+        Predicts which action was taken, given a state and the next state.
+        Input is 2-d: position and change in velocity.
+        Output is 3 logits, one per action.
+    '''
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(2, 64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 3)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        return self.fc3(x)
+
+
+def make_features(obs, next_obs):
+    # an action changes the velocity by a tiny amount, and how much depends on the position (gravity),
+    # so use the position and the change in velocity
+    return torch.cat([obs[:, :1], next_obs[:, 1:] - obs[:, 1:]], dim=1)
+
+
+def collect_held_random_data(num_episodes, max_hold=30):
+    # like collect_random_interaction_data, but each random action is repeated for 1 to max_hold steps.
+    # Changing the action every step just jiggles the car near the bottom of the valley, so the
+    # model never sees the positions the demonstrations reach.
+    states = []
+    next_states = []
+    actions = []
+
+    env = gym.make('MountainCar-v0')
+
+    for i in range(num_episodes):
+        obs, _ = env.reset()
+        done = False
+        steps_left = 0
+        while not done:
+            if steps_left == 0:
+                a = env.action_space.sample()
+                steps_left = np.random.randint(1, max_hold + 1)
+            next_obs, reward, terminated, truncated, info = env.step(a)
+            done = terminated or truncated
+            states.append(obs)
+            next_states.append(next_obs)
+            actions.append(a)
+            obs = next_obs
+            steps_left -= 1
+
+    env.close()
+
+    return np.array(states), np.array(next_states), np.array(actions)
+
+
+def inverse_dynamics(obs, next_obs, num_iters, ground_truth_acts=None, num_random_episodes=50):
+    # train on random interaction data only, never on the demonstrations
+    rand_s, rand_s2, rand_a = collect_held_random_data(num_random_episodes)
+    rand_x = make_features(torch.from_numpy(rand_s).float(), torch.from_numpy(rand_s2).float())
+    rand_a = torch.from_numpy(rand_a).long()
+
+    # scale each input feature to roughly mean 0, std 1 (velocity changes are about 1000x smaller than position)
+    mean = rand_x.mean(dim=0)
+    std = rand_x.std(dim=0)
+    rand_x = (rand_x - mean) / std
+
+    model = InverseDynamicsNetwork()
+    optimizer = Adam(model.parameters(), lr=0.01)
+    loss_criterion = nn.CrossEntropyLoss()
+
+    for i in range(num_iters):
+        optimizer.zero_grad()
+        loss = loss_criterion(model(rand_x), rand_a)
+        loss.backward()
+        optimizer.step()
+        if i % 100 == 0:
+            print("iteration", i, "inverse dynamics loss", loss.item())
+
+    # estimate the action for every (state, next state) pair in the demonstrations
+    with torch.no_grad():
+        demo_x = (make_features(obs, next_obs) - mean) / std
+        estimated_acts = torch.argmax(model(demo_x), dim=1)
+        rand_acc = (torch.argmax(model(rand_x), dim=1) == rand_a).float().mean().item()
+
+    print("inverse dynamics accuracy on random data:", rand_acc)
+    if ground_truth_acts is not None:
+        demo_acc = (estimated_acts == ground_truth_acts).float().mean().item()
+        print("inverse dynamics accuracy on demonstration data:", demo_acc)
+
+    return estimated_acts
+
+
 #evaluate learned policy
 def evaluate_policy(pi, num_evals, human_render=True):
     if human_render:
@@ -153,8 +245,9 @@ if __name__ == "__main__":
     #process demos
     obs, ground_truth_acts, next_obs = torchify_demos(demos)
 
-    # TODO: ADD CODE TO TRAIN INVERSE DYNAMICS MODEL AND ESTIMATE ACTIONS
-    estimated_acts = inverse_dynamics(obs, next_obs, args.num_inv_dyn_iters)
+    # train the inverse dynamics model on random data and use it to estimate the demo actions
+    # (the ground truth actions are only passed in to report accuracy, not used for training)
+    estimated_acts = inverse_dynamics(obs, next_obs, args.num_inv_dyn_iters, ground_truth_acts)
 
     #train policy WITHOUT ground truth actions
     pi = PolicyNetwork()
