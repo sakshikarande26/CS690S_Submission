@@ -86,29 +86,6 @@ The special terminal state (25) has all zero state features.
 - $\tilde{\textrm{f}}$ should be averaged over all demonstrations trajectories (i.e. it is an expected value that needs to be divided by the number of trajectories).  The paper isn't totally clear about this.
 - For all questions, seed the reward weights with all zeros unless instructed otherwise.
 
-
-## Answer the following questions:
-
-<strong>You will need to type up your responses to the following parts of the homework (preferably typeset in LaTeX) and submit your responses and code via Gradescope. You are encouraged to talk about the homework with other students and share resources, but please do not share or copy code. </strong>
-
-1. Experiment and choose a good static step size / learning rate for gradient descent (i.e. a scalar value to multiply the gradient by, in order to decide on the magnitude of the weight update at each iteration). Describe how you chose an appropriate learning rate. 
-
-2. Run MaxEntIRL for 100 epochs with a horizon of 15 and describe the shape of the reward function.  What does it appear to be trying to do, qualitatively, and why?  Do you think it treats state 12 in a sensible way based on the given demostrations, and might it be wrong (with respect to the ground truth reward function that generated the given optimal demonstrations)? Include a graph of the reward function in your writeup.
-
-3. We will now do a simplified calculation of the gradient of the loss function:
-   <img width="601" alt="grad" src="https://github.com/sniekum/MaxEntIRL_assignment/assets/1664131/5395c12f-17ef-4f2f-8482-0f66a2075c15">
-
-   If you are having difficulty, you might want to refresh your memory on how to take derivatives of logs, exponentials, and how to use the chain and product rule. I strongly recommend typesetting your derivation in LaTeX (along with the rest of the writeup).
-
-4. Compare equations 5 and 7.  Intuitively, why does the MaxEnt policy of equation 5 equally weight paths in the example in Figure 2, while the action based distribution model of equation 7 weights them differently?  Why is the weighting of equation 7 problematic?
-
-5. Explain in your own words what $Z_{a_{ij}}$ and $Z_{s_i}$ represent over a particular horizon.
-
-6. Why is 1 added to $Z_s$ for terminal states?  (hint: think of the equation for $Z_{s}$ in terms of returns of trajectories)
-
-## Submission
-Prepare a PDF report with your answers to the questions (preferably typeset in LaTeX) and submit the PDF and code separately on Gradescope under the respective submissions.
-
 ## Implementation notes
 
 ### calcMaxEntPolicy
