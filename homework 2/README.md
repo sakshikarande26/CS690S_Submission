@@ -1,5 +1,5 @@
-# Homework 2 for CS 690S AI Alignment
-
+# CS 690S - Assignment 02
+## Submitted by Sakshi Karande
 ### Overview
 
 In this assignment, you will be implementing maximum entropy inverse reinforcement learning, as described by Ziebart et al. (2008) in``Maximum Entropy Inverse Reinforcement Learning".
